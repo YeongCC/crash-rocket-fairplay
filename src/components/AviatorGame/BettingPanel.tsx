@@ -71,7 +71,7 @@ const BettingPanel: React.FC = () => {
             onChange={(e) => setBetAmount(Number(e.target.value))}
             className="w-full betting-input"
             min={1}
-            disabled={gameState === "running" && activeUserBet}
+            disabled={!!activeUserBet && gameState === "running"}
           />
           
           {/* Quick bet options */}
@@ -86,7 +86,7 @@ const BettingPanel: React.FC = () => {
                   "flex-1 min-w-0",
                   betAmount === amount && "bg-accent text-accent-foreground"
                 )}
-                disabled={gameState === "running" && activeUserBet}
+                disabled={!!activeUserBet && gameState === "running"}
               >
                 ${amount}
               </Button>
@@ -104,7 +104,7 @@ const BettingPanel: React.FC = () => {
               id="autoCashout"
               checked={isAutoCashout}
               onCheckedChange={setIsAutoCashout}
-              disabled={gameState === "running" && activeUserBet}
+              disabled={!!activeUserBet && gameState === "running"}
             />
           </div>
           <Input
@@ -115,7 +115,7 @@ const BettingPanel: React.FC = () => {
             className="w-full betting-input"
             min={1.1}
             step={0.1}
-            disabled={!isAutoCashout || (gameState === "running" && activeUserBet)}
+            disabled={!isAutoCashout || (!!activeUserBet && gameState === "running")}
           />
         </div>
         
@@ -140,7 +140,7 @@ const BettingPanel: React.FC = () => {
             >
               Cash Out ({(activeUserBet.amount * useGame().currentMultiplier).toFixed(2)})
             </Button>
-          ) : gameState !== "running" ? (
+          ) : gameState === "waiting" || gameState === "crashed" ? (
             <Button 
               onClick={handlePlaceBet}
               className="w-full h-14 bg-aviator-red hover:bg-aviator-red/90 text-white font-bold text-xl"

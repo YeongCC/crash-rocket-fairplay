@@ -37,7 +37,7 @@ const GameCanvas: React.FC = () => {
       </div>
       
       {/* Countdown overlay */}
-      {gameState === "waiting" && (
+      {(gameState === "waiting" || gameState === "crashed") && (
         <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm bg-black/20 z-40">
           <div className="text-center">
             <p className="text-xl text-white mb-2">Next round in</p>

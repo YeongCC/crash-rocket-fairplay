@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { 
   generateCrashPoint, 
@@ -125,6 +126,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Reset current multiplier
     setCurrentMultiplier(1.00);
     
+    // Reset active bets for the new round
+    setActiveBets([]);
+    
     // Set game state to running
     setGameState("running");
     
@@ -163,7 +167,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return parseFloat(newMultiplier.toFixed(2));
       });
       
-      // Process auto cashouts
+      // Process auto cashouts - check more frequently
       checkAutoCashouts();
     }, 100);
     
@@ -174,6 +178,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const processLostBets = () => {
     // Get all active bets that haven't been cashed out
     const lostBets = activeBets.filter(bet => !bet.hashedOut);
+    
+    if (lostBets.length === 0) return;
     
     // Update the bets with the crash result
     const updatedLostBets = lostBets.map(bet => ({
@@ -224,6 +230,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Check if any bets need to be auto cashed out
     autoCashoutBets.forEach(bet => {
       if (bet.targetMultiplier! <= currentMultiplier) {
+        console.log(`Auto-cashout triggered for bet ${bet.id} at ${currentMultiplier}x (target: ${bet.targetMultiplier}x)`);
         cashOut(bet.id);
       }
     });
@@ -239,6 +246,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!validateBetAmount(amount, balance)) {
       return;
     }
+    
+    console.log(`Placing bet: $${amount}, autoCashout: ${autoCashout}, target: ${targetMultiplier}x`);
     
     // Create new bet
     const newBet: Bet = {
