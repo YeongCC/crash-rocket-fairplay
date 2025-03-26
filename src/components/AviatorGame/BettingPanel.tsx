@@ -14,7 +14,8 @@ const BettingPanel: React.FC = () => {
     cashOut,
     activeBets,
     autoBetSettings,
-    setAutoBetSettings
+    setAutoBetSettings,
+    cancelBet
   } = useGame();
   
   const [betAmount, setBetAmount] = useState<number>(10);
@@ -27,6 +28,13 @@ const BettingPanel: React.FC = () => {
   // Handle placing a bet
   const handlePlaceBet = () => {
     placeBet(betAmount, isAutoCashout, isAutoCashout ? autoCashoutValue : null);
+  };
+  
+  // Handle canceling a bet
+  const handleCancelBet = () => {
+    if (activeUserBet) {
+      cancelBet(activeUserBet.id);
+    }
   };
   
   // Handle cashing out
@@ -140,7 +148,14 @@ const BettingPanel: React.FC = () => {
             >
               Cash Out ({(activeUserBet.amount * useGame().currentMultiplier).toFixed(2)})
             </Button>
-          ) : gameState === "waiting" || gameState === "crashed" ? (
+          ) : gameState === "waiting" && activeUserBet && !activeUserBet.hashedOut ? (
+            <Button 
+              onClick={handleCancelBet}
+              className="w-full h-14 bg-yellow-500 hover:bg-yellow-600 text-white font-bold text-xl"
+            >
+              Cancel Bet
+            </Button>
+          ) : (gameState === "waiting" || gameState === "crashed") ? (
             <Button 
               onClick={handlePlaceBet}
               className="w-full h-14 bg-aviator-red hover:bg-aviator-red/90 text-white font-bold text-xl"

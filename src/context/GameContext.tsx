@@ -46,6 +46,7 @@ interface GameContextType {
   roundHistory: GameRound[];
   activeBets: Bet[];
   placeBet: (amount: number, autoCashout: boolean, targetMultiplier: number | null) => void;
+  cancelBet: (betId: string) => void; // Add cancel bet function
   cashOut: (betId: string) => void;
   currentRoundId: string | null;
   nextGameCountdown: number;
@@ -90,7 +91,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Current round ID
   const [currentRoundId, setCurrentRoundId] = useState<string | null>(null);
   
-  // Countdown to next game - increased to 15 seconds
+  // Countdown to next game
   const [nextGameCountdown, setNextGameCountdown] = useState<number>(15);
   
   // Auto bet settings
@@ -121,6 +122,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     // Generate crash point
     const crashPoint = generateCrashPoint(serverSeed, scalingFactor);
+    console.log(`New round starting. Crash point: ${crashPoint}`);
     setCurrentCrashPoint(crashPoint);
     
     // Reset current multiplier
@@ -131,6 +133,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     // Set game state to running
     setGameState("running");
+    
+    // Apply auto bet if enabled
+    if (autoBetSettings.enabled) {
+      setTimeout(() => {
+        placeBet(
+          autoBetSettings.amount, 
+          true, 
+          autoBetSettings.targetMultiplier
+        );
+      }, 500);
+    }
     
     // Start updating multiplier
     const interval = setInterval(() => {
@@ -179,8 +192,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Get all active bets that haven't been cashed out
     const lostBets = activeBets.filter(bet => !bet.hashedOut);
     
-    if (lostBets.length === 0) return;
-    
     // Update the bets with the crash result
     const updatedLostBets = lostBets.map(bet => ({
       ...bet,
@@ -207,17 +218,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     setRoundHistory(prev => [newRound, ...prev]);
-    
-    // Apply auto bet if enabled (for next round)
-    if (autoBetSettings.enabled) {
-      setTimeout(() => {
-        placeBet(
-          autoBetSettings.amount, 
-          true, 
-          autoBetSettings.targetMultiplier
-        );
-      }, 5500);
-    }
   };
   
   // Check for auto cashouts
@@ -231,9 +231,36 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     autoCashoutBets.forEach(bet => {
       if (bet.targetMultiplier! <= currentMultiplier) {
         console.log(`Auto-cashout triggered for bet ${bet.id} at ${currentMultiplier}x (target: ${bet.targetMultiplier}x)`);
-        cashOut(bet.id);
+        cashOut(bet.id, true);
       }
     });
+  };
+  
+  // Cancel a bet (only during waiting state)
+  const cancelBet = (betId: string) => {
+    // Find the bet
+    const betIndex = activeBets.findIndex(bet => bet.id === betId);
+    
+    if (betIndex === -1) {
+      toast.error("Bet not found");
+      return;
+    }
+    
+    const bet = activeBets[betIndex];
+    
+    // Check if bet has already been cashed out
+    if (bet.hashedOut) {
+      toast.error("Bet already completed");
+      return;
+    }
+    
+    // Return the funds
+    setBalance(prev => prev + bet.amount);
+    
+    // Remove the bet from active bets
+    setActiveBets(prev => prev.filter(b => b.id !== betId));
+    
+    toast.info(`Bet canceled: $${bet.amount.toFixed(2)} returned`);
   };
   
   // Place a bet
@@ -265,19 +292,29 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Update balance
     setBalance(prev => prev - amount);
     
-    // Add bet to active bets
-    setActiveBets(prev => [...prev, newBet]);
+    // Check if there's already an active bet for this user
+    const existingBet = activeBets.find(bet => bet.username === "Player" && !bet.hashedOut);
+    if (existingBet) {
+      // Replace the existing bet
+      setActiveBets(prev => [
+        ...prev.filter(bet => bet.id !== existingBet.id),
+        newBet
+      ]);
+    } else {
+      // Add bet to active bets
+      setActiveBets(prev => [...prev, newBet]);
+    }
     
     toast.success(`Bet placed: $${amount}`);
   };
   
   // Cash out
-  const cashOut = (betId: string) => {
+  const cashOut = (betId: string, isAuto: boolean = false) => {
     // Find the bet
     const betIndex = activeBets.findIndex(bet => bet.id === betId);
     
     if (betIndex === -1) {
-      toast.error("Bet not found");
+      console.error("Bet not found:", betId);
       return;
     }
     
@@ -285,7 +322,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     // Check if bet has already been cashed out
     if (bet.hashedOut) {
-      toast.error("Bet already cashed out");
+      console.error("Bet already cashed out:", betId);
       return;
     }
     
@@ -310,7 +347,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Update balance
     setBalance(prev => prev + winnings);
     
-    toast.success(`Cashed out: $${winnings.toFixed(2)} at ${currentMultiplier.toFixed(2)}x`);
+    if (isAuto) {
+      toast.success(`Auto Cash Out: $${winnings.toFixed(2)} at ${currentMultiplier.toFixed(2)}x`);
+    } else {
+      toast.success(`Cashed out: $${winnings.toFixed(2)} at ${currentMultiplier.toFixed(2)}x`);
+    }
   };
   
   // Initialize the game
@@ -349,6 +390,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     roundHistory,
     activeBets,
     placeBet,
+    cancelBet,
     cashOut,
     currentRoundId,
     nextGameCountdown,
