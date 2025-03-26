@@ -3,6 +3,7 @@ import React from "react";
 import { useGame } from "@/context/GameContext";
 import Rocket from "./Rocket";
 import Multiplier from "./Multiplier";
+import TimerBar from "./TimerBar";
 
 const GameCanvas: React.FC = () => {
   const { gameState, nextGameCountdown } = useGame();
@@ -26,6 +27,11 @@ const GameCanvas: React.FC = () => {
             }}
           />
         ))}
+      </div>
+      
+      {/* Timer Bar - added at the top */}
+      <div className="absolute top-2 left-2 right-2 z-30">
+        <TimerBar />
       </div>
       
       {/* Rocket and trails */}

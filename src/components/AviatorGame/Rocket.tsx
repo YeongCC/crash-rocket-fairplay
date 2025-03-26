@@ -60,14 +60,35 @@ const Rocket: React.FC = () => {
     }
   }, [gameState]);
   
-  // Calculate rocket position based on multiplier
-  const rocketStyle = {
-    transform: gameState === "running" || gameState === "crashed" 
-      ? `translate(${Math.min(60, currentMultiplier * 4)}vw, -${Math.min(50, currentMultiplier * 8)}vh) rotate(${Math.min(45, currentMultiplier * 3)}deg)`
-      : "translate(0, 0) rotate(0deg)",
-    opacity: gameState === "crashed" ? 0 : 1,
-    transition: "transform 0.5s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.5s",
+  // Calculate rocket position based on multiplier using a logarithmic curve
+  // This better simulates a graph-like trajectory
+  const getRocketStyle = () => {
+    if (gameState === "waiting") {
+      return {
+        transform: "translate(0, 0) rotate(0deg)",
+        opacity: 1,
+        transition: "transform 0.5s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.5s",
+      };
+    }
+    
+    // Calculate x position - logarithmic to start fast then slow down
+    const xPos = Math.min(70, 15 * Math.log(currentMultiplier + 1));
+    
+    // Calculate y position - should follow an exponential curve (higher as multiplier grows)
+    // Using negative value to move upwards from bottom
+    const yPos = Math.min(70, 20 * Math.log(currentMultiplier + 1));
+    
+    // Rotation increases slightly with multiplier
+    const rotation = Math.min(70, currentMultiplier * 3);
+    
+    return {
+      transform: `translate(${xPos}vw, -${yPos}vh) rotate(${rotation}deg)`,
+      opacity: gameState === "crashed" ? 0 : 1,
+      transition: "transform 0.5s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.5s",
+    };
   };
+  
+  const rocketStyle = getRocketStyle();
   
   return (
     <>
@@ -85,6 +106,19 @@ const Rocket: React.FC = () => {
           className="text-aviator-red transform rotate-90" 
         />
       </div>
+      
+      {/* Add a faint path line to visualize trajectory */}
+      {gameState === "running" && (
+        <svg className="absolute inset-0 h-full w-full overflow-visible z-5 opacity-20">
+          <path
+            d={`M 40,${400 - 40} Q ${200},${400 - 150} ${Math.min(400, 40 + currentMultiplier * 30)},${Math.max(50, 400 - (currentMultiplier * 20))}`}
+            stroke="white"
+            strokeWidth="1"
+            fill="none"
+            strokeDasharray="5,5"
+          />
+        </svg>
+      )}
     </>
   );
 };
