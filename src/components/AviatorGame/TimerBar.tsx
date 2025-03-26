@@ -8,7 +8,7 @@ const TimerBar: React.FC = () => {
   
   // Show different content based on game state
   const renderContent = () => {
-    if (gameState === "waiting") {
+    if (gameState === "waiting" || gameState === "crashed") {
       return (
         <div className="w-full space-y-1">
           <div className="flex justify-between text-xs text-gray-200">

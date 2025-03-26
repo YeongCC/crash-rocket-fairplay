@@ -144,20 +144,18 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Process losing bets
           processLostBets();
           
-          // Schedule new round - updated to 15 seconds
-          setTimeout(() => {
-            setNextGameCountdown(15);
-            const countdownInterval = setInterval(() => {
-              setNextGameCountdown(prev => {
-                if (prev <= 1) {
-                  clearInterval(countdownInterval);
-                  startNewRound();
-                  return 0;
-                }
-                return prev - 1;
-              });
-            }, 1000);
-          }, 2000);
+          // Start countdown for new round immediately
+          setNextGameCountdown(15);
+          const countdownInterval = setInterval(() => {
+            setNextGameCountdown(prev => {
+              if (prev <= 1) {
+                clearInterval(countdownInterval);
+                startNewRound();
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
           
           return crashPoint;
         }
