@@ -103,7 +103,7 @@ const Rocket: React.FC = () => {
       >
         <RocketIcon 
           size={48} 
-          className="text-aviator-red transform rotate-90" 
+          className="text-aviator-red transform -rotate-90" 
         />
       </div>
       

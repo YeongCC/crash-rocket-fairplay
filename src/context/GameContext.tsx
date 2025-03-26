@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { 
   generateCrashPoint, 
@@ -90,8 +89,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Current round ID
   const [currentRoundId, setCurrentRoundId] = useState<string | null>(null);
   
-  // Countdown to next game
-  const [nextGameCountdown, setNextGameCountdown] = useState<number>(5);
+  // Countdown to next game - increased to 15 seconds
+  const [nextGameCountdown, setNextGameCountdown] = useState<number>(15);
   
   // Auto bet settings
   const [autoBetSettings, setAutoBetSettings] = useState({
@@ -145,9 +144,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Process losing bets
           processLostBets();
           
-          // Schedule new round
+          // Schedule new round - updated to 15 seconds
           setTimeout(() => {
-            setNextGameCountdown(5);
+            setNextGameCountdown(15);
             const countdownInterval = setInterval(() => {
               setNextGameCountdown(prev => {
                 if (prev <= 1) {
@@ -309,14 +308,27 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   // Initialize the game
   useEffect(() => {
-    // Start first round
-    startNewRound();
+    // Don't start the first round immediately, start with a countdown
+    setGameState("waiting");
+    setNextGameCountdown(15);
+    
+    const countdownInterval = setInterval(() => {
+      setNextGameCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          startNewRound();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     
     // Clean up on unmount
     return () => {
       if (multiplierInterval) {
         clearInterval(multiplierInterval);
       }
+      clearInterval(countdownInterval);
     };
   }, []);
   

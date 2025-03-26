@@ -6,6 +6,7 @@ import BettingPanel from "./BettingPanel";
 import GameHistory from "./GameHistory";
 import LeaderBoard from "./LeaderBoard";
 import GameInfo from "./GameInfo";
+import TimerBar from "./TimerBar";
 
 const AviatorGame: React.FC = () => {
   return (
@@ -22,8 +23,9 @@ const AviatorGame: React.FC = () => {
               <LeaderBoard />
             </div>
             
-            {/* Center Column - Game Canvas */}
-            <div className="lg:col-span-1">
+            {/* Center Column - Timer Bar and Game Canvas */}
+            <div className="lg:col-span-1 space-y-2">
+              <TimerBar />
               <GameCanvas />
             </div>
             
