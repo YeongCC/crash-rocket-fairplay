@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useGame } from "@/context/GameContext";
 import Rocket from "./Rocket";
@@ -50,3 +49,4 @@ const GameCanvas: React.FC = () => {
 };
 
 export default GameCanvas;
+

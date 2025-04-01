@@ -22,8 +22,8 @@ const GameHistory: React.FC = () => {
         {roundHistory.length === 0 ? (
           <p className="text-gray-500">No game history yet</p>
         ) : (
-          roundHistory.slice(0, 15).map((round) => (
-            <Popover key={round.id}>
+          roundHistory.slice(0, 15).map((round, index) => (
+            <Popover key={round.id || `round-${index}`}>
               <PopoverTrigger asChild>
                 <Button 
                   variant="ghost" 

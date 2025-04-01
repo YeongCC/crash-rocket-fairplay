@@ -37,7 +37,7 @@ const AviatorGame: React.FC = () => {
           
           {/* Game History */}
           <div className="pt-4">
-            <GameHistory />
+            {/* <GameHistory /> */}
           </div>
         </div>
       </div>

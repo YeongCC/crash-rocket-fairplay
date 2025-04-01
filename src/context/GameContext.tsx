@@ -1,417 +1,231 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { 
-  generateCrashPoint, 
-  generateServerSeed, 
-  calculateScalingFactor,
-  calculateBetResult,
-  validateBetAmount
-} from "@/utils/gameUtils";
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { toast } from "sonner";
+import {
+  generateCrashPoint,
+  generateServerSeed,
+  calculateScalingFactor,
+} from "@/utils/gameUtils";
 
-// Game states
+const generateRandomUsername = (): string => {
+  const id = Math.floor(Math.random() * 100000);
+  return `Player_${id}`;
+};
+
 export type GameState = "waiting" | "running" | "crashed";
 
-// Types for bet
-export interface Bet {
+interface Bet {
   id: string;
   amount: number;
-  targetMultiplier: number | null;
   actualMultiplier: number | null;
-  timestamp: Date;
   result: number;
-  username: string;
-  autoCashout: boolean;
   hashedOut: boolean;
+  username: string;
 }
 
-// Types for game history
-export interface GameRound {
-  id: string;
-  crashPoint: number;
-  timestamp: Date;
-  serverSeed: string;
-  clientSeed: string;
-  nonce: number;
-  bets: Bet[];
-}
-
-// Context interface
 interface GameContextType {
   balance: number;
-  setBalance: React.Dispatch<React.SetStateAction<number>>;
   gameState: GameState;
   currentMultiplier: number;
-  currentServerSeed: string;
-  roundHistory: GameRound[];
-  activeBets: Bet[];
-  placeBet: (amount: number, autoCashout: boolean, targetMultiplier: number | null) => void;
-  cancelBet: (betId: string) => void; // Add cancel bet function
-  cashOut: (betId: string) => void;
-  currentRoundId: string | null;
   nextGameCountdown: number;
-  autoBetSettings: {
-    enabled: boolean;
-    amount: number;
-    targetMultiplier: number;
-  };
-  setAutoBetSettings: React.Dispatch<React.SetStateAction<{
-    enabled: boolean;
-    amount: number;
-    targetMultiplier: number;
-  }>>;
+  activeBets: Bet[];
+  placeBet: (amount: number) => void;
+  cancelBet: (betId: string) => void;
+  cashOut: (betId: string) => void;
+  autoBetEnabled: boolean;
+  setAutoBetEnabled: (enabled: boolean) => void;
+  autoBetAmount: number;
+  setAutoBetAmount: (amount: number) => void;
+  autoCashoutEnabled: boolean;
+  setAutoCashoutEnabled: (enabled: boolean) => void;
+  autoCashoutValue: number;
+  setAutoCashoutValue: (value: number) => void;
+  username: string;
+  roundId: any;
 }
 
-// Create context
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-// Provider component
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // User balance
-  const [balance, setBalance] = useState<number>(1000);
-  
-  // Game state
+  const [balance, setBalance] = useState(1000);
   const [gameState, setGameState] = useState<GameState>("waiting");
-  
-  // Current multiplier (updates during the game)
-  const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.00);
-  
-  // Crash point for the current round (hidden from user until crash)
-  const [currentCrashPoint, setCurrentCrashPoint] = useState<number>(1.00);
-  
-  // Server seed for the current round
-  const [currentServerSeed, setCurrentServerSeed] = useState<string>("");
-  
-  // Game history
-  const [roundHistory, setRoundHistory] = useState<GameRound[]>([]);
-  
-  // Active bets in the current round
+  const [currentMultiplier, setCurrentMultiplier] = useState(1.0);
   const [activeBets, setActiveBets] = useState<Bet[]>([]);
-  
-  // Current round ID
-  const [currentRoundId, setCurrentRoundId] = useState<string | null>(null);
-  
-  // Countdown to next game
-  const [nextGameCountdown, setNextGameCountdown] = useState<number>(15);
-  
-  // Auto bet settings
-  const [autoBetSettings, setAutoBetSettings] = useState({
-    enabled: false,
-    amount: 10,
-    targetMultiplier: 2.0
-  });
-  
-  // Interval for updating multiplier
-  const [multiplierInterval, setMultiplierInterval] = useState<NodeJS.Timeout | null>(null);
-  
-  // Start a new game round
-  const startNewRound = () => {
-    // Generate a new round ID
-    const newRoundId = Math.random().toString(36).substring(2, 15);
-    setCurrentRoundId(newRoundId);
-    
-    // Calculate scaling factor based on recent history (last 10 rounds)
-    const recentPayouts = roundHistory
-      .slice(0, 10)
-      .map(round => round.crashPoint);
-    const scalingFactor = calculateScalingFactor(recentPayouts);
-    
-    // Generate server seed and crash point
-    const serverSeed = generateServerSeed();
-    setCurrentServerSeed(serverSeed);
-    
-    // Generate crash point
-    const crashPoint = generateCrashPoint(serverSeed, scalingFactor);
-    console.log(`New round starting. Crash point: ${crashPoint}`);
-    setCurrentCrashPoint(crashPoint);
-    
-    // Reset current multiplier
-    setCurrentMultiplier(1.00);
-    
-    // Reset active bets for the new round
-    setActiveBets([]);
-    
-    // Set game state to running
-    setGameState("running");
-    
-    // Apply auto bet if enabled
-    if (autoBetSettings.enabled) {
-      setTimeout(() => {
-        placeBet(
-          autoBetSettings.amount, 
-          true, 
-          autoBetSettings.targetMultiplier
-        );
-      }, 500);
-    }
-    
-    // Start updating multiplier
-    const interval = setInterval(() => {
-      setCurrentMultiplier(prev => {
-        const newMultiplier = prev + 0.01;
-        
-        // Check if the new multiplier is greater than or equal to the crash point
-        if (newMultiplier >= crashPoint) {
-          // Clear interval
-          clearInterval(interval);
-          
-          // Set game state to crashed
-          setGameState("crashed");
-          
-          // Process losing bets
-          processLostBets();
-          
-          // Start countdown for new round immediately
-          setNextGameCountdown(15);
-          const countdownInterval = setInterval(() => {
-            setNextGameCountdown(prev => {
-              if (prev <= 1) {
-                clearInterval(countdownInterval);
-                startNewRound();
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-          
-          return crashPoint;
-        }
-        
-        return parseFloat(newMultiplier.toFixed(2));
-      });
-      
-      // Process auto cashouts - check more frequently
-      checkAutoCashouts();
-    }, 100);
-    
-    setMultiplierInterval(interval);
-  };
-  
-  // Process lost bets (when the game crashes)
-  const processLostBets = () => {
-    // Get all active bets that haven't been cashed out
-    const lostBets = activeBets.filter(bet => !bet.hashedOut);
-    
-    // Update the bets with the crash result
-    const updatedLostBets = lostBets.map(bet => ({
-      ...bet,
-      actualMultiplier: currentCrashPoint,
-      result: 0 // They lost their bet
-    }));
-    
-    // Update active bets
-    setActiveBets(prev => 
-      prev.map(bet => 
-        bet.hashedOut ? bet : updatedLostBets.find(lostBet => lostBet.id === bet.id) || bet
-      )
-    );
-    
-    // Add the round to history
-    const newRound: GameRound = {
-      id: currentRoundId!,
-      crashPoint: currentCrashPoint,
-      timestamp: new Date(),
-      serverSeed: currentServerSeed,
-      clientSeed: "player_seed", // In a real game, the client would provide this
-      nonce: roundHistory.length + 1,
-      bets: [...activeBets]
-    };
-    
-    setRoundHistory(prev => [newRound, ...prev]);
-  };
-  
-  // Check for auto cashouts
-  const checkAutoCashouts = () => {
-    // Get all active bets with auto cashout enabled
-    const autoCashoutBets = activeBets.filter(
-      bet => bet.autoCashout && bet.targetMultiplier !== null && !bet.hashedOut
-    );
-    
-    // Check if any bets need to be auto cashed out
-    autoCashoutBets.forEach(bet => {
-      if (bet.targetMultiplier! <= currentMultiplier) {
-        console.log(`Auto-cashout triggered for bet ${bet.id} at ${currentMultiplier}x (target: ${bet.targetMultiplier}x)`);
-        cashOut(bet.id, true);
-      }
-    });
-  };
-  
-  // Cancel a bet (only during waiting state)
-  const cancelBet = (betId: string) => {
-    // Find the bet
-    const betIndex = activeBets.findIndex(bet => bet.id === betId);
-    
-    if (betIndex === -1) {
-      toast.error("Bet not found");
-      return;
-    }
-    
-    const bet = activeBets[betIndex];
-    
-    // Check if bet has already been cashed out
-    if (bet.hashedOut) {
-      toast.error("Bet already completed");
-      return;
-    }
-    
-    // Return the funds
-    setBalance(prev => prev + bet.amount);
-    
-    // Remove the bet from active bets
-    setActiveBets(prev => prev.filter(b => b.id !== betId));
-    
-    toast.info(`Bet canceled: $${bet.amount.toFixed(2)} returned`);
-  };
-  
-  // Place a bet
-  const placeBet = (
-    amount: number, 
-    autoCashout: boolean = false, 
-    targetMultiplier: number | null = null
-  ) => {
-    // Validate bet amount
-    if (!validateBetAmount(amount, balance)) {
-      return;
-    }
-    
-    console.log(`Placing bet: $${amount}, autoCashout: ${autoCashout}, target: ${targetMultiplier}x`);
-    
-    // Create new bet
-    const newBet: Bet = {
-      id: Math.random().toString(36).substring(2, 15),
-      amount,
-      targetMultiplier,
-      actualMultiplier: null,
-      timestamp: new Date(),
-      result: 0,
-      username: "Player", // In a real game, this would be the user's name
-      autoCashout,
-      hashedOut: false
-    };
-    
-    // Update balance
-    setBalance(prev => prev - amount);
-    
-    // Check if there's already an active bet for this user
-    const existingBet = activeBets.find(bet => bet.username === "Player" && !bet.hashedOut);
-    if (existingBet) {
-      // Replace the existing bet
-      setActiveBets(prev => [
-        ...prev.filter(bet => bet.id !== existingBet.id),
-        newBet
-      ]);
-    } else {
-      // Add bet to active bets
-      setActiveBets(prev => [...prev, newBet]);
-    }
-    
-    toast.success(`Bet placed: $${amount}`);
-  };
-  
-  // Cash out
-  const cashOut = (betId: string, isAuto: boolean = false) => {
-    // Find the bet
-    const betIndex = activeBets.findIndex(bet => bet.id === betId);
-    
-    if (betIndex === -1) {
-      console.error("Bet not found:", betId);
-      return;
-    }
-    
-    const bet = activeBets[betIndex];
-    
-    // Check if bet has already been cashed out
-    if (bet.hashedOut) {
-      console.error("Bet already cashed out:", betId);
-      return;
-    }
-    
-    // Calculate winnings
-    const winnings = bet.amount * currentMultiplier;
-    
-    // Update bet
-    const updatedBet: Bet = {
-      ...bet,
-      hashedOut: true,
-      actualMultiplier: currentMultiplier,
-      result: winnings
-    };
-    
-    // Update active bets
-    setActiveBets(prev => {
-      const newBets = [...prev];
-      newBets[betIndex] = updatedBet;
-      return newBets;
-    });
-    
-    // Update balance
-    setBalance(prev => prev + winnings);
-    
-    if (isAuto) {
-      toast.success(`Auto Cash Out: $${winnings.toFixed(2)} at ${currentMultiplier.toFixed(2)}x`);
-    } else {
-      toast.success(`Cashed out: $${winnings.toFixed(2)} at ${currentMultiplier.toFixed(2)}x`);
-    }
-  };
-  
-  // Initialize the game
-  useEffect(() => {
-    // Don't start the first round immediately, start with a countdown
+  const [nextGameCountdown, setNextGameCountdown] = useState(5);
+  const [recentPayouts, setRecentPayouts] = useState<number[]>([]);
+  const [autoBetEnabled, setAutoBetEnabled] = useState(false);
+  const [autoBetAmount, setAutoBetAmount] = useState(10);
+  const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
+  const [autoCashoutValue, setAutoCashoutValue] = useState(2.0);
+  const [username] = useState(generateRandomUsername());
+  const [roundId, setRoundId] = useState(0); 
+
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const multiplierTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const activeBetsRef = useRef(activeBets);
+  const autoCashoutEnabledRef = useRef(autoCashoutEnabled);
+  const autoCashoutValueRef = useRef(autoCashoutValue);
+  const currentMultiplierRef = useRef(currentMultiplier);
+
+  useEffect(() => { activeBetsRef.current = activeBets; }, [activeBets]);
+  useEffect(() => { autoCashoutEnabledRef.current = autoCashoutEnabled; }, [autoCashoutEnabled]);
+  useEffect(() => { autoCashoutValueRef.current = autoCashoutValue; }, [autoCashoutValue]);
+  useEffect(() => { currentMultiplierRef.current = currentMultiplier; }, [currentMultiplier]);
+
+  const startCountdown = () => {
+    clearInterval(countdownTimerRef.current!);
     setGameState("waiting");
-    setNextGameCountdown(15);
-    
-    const countdownInterval = setInterval(() => {
-      setNextGameCountdown(prev => {
+    setNextGameCountdown(5);
+    setRoundId((prev) => prev + 1);
+    countdownTimerRef.current = setInterval(() => {
+      setNextGameCountdown((prev) => {
         if (prev <= 1) {
-          clearInterval(countdownInterval);
-          startNewRound();
+          clearInterval(countdownTimerRef.current!);
+
+          if (autoBetEnabled && balance >= autoBetAmount) {
+            placeBet(autoBetAmount);
+          }
+
+          startGame();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const startGame = () => {
+    clearInterval(multiplierTimerRef.current!);
+    setGameState("running");
+    setCurrentMultiplier(1.0);
+
+    const scalingFactor = calculateScalingFactor(recentPayouts.slice(-10));
+    const serverSeed = generateServerSeed();
+    const crashPoint = generateCrashPoint(serverSeed, scalingFactor);
+
+    multiplierTimerRef.current = setInterval(() => {
+      setCurrentMultiplier((prev) => {
+        const next = parseFloat((prev + 0.01).toFixed(2));
+
+        if (autoCashoutEnabledRef.current) {
+          const userBet = activeBetsRef.current.find(
+            (b) => b.username === username && !b.hashedOut
+          );
+          if (userBet && next >= autoCashoutValueRef.current) {
+            cashOut(userBet.id);
+          }
+        }
+
+        if (next >= crashPoint) {
+          clearInterval(multiplierTimerRef.current!);
+          crashNow(crashPoint);
+          return crashPoint;
+        }
+
+        return next;
+      });
+    }, 100);
+  };
+
+  const crashNow = (finalMultiplier: number) => {
+    setGameState("crashed");
+
+    setActiveBets(prev =>
+      prev.map(b => !b.hashedOut
+        ? { ...b, actualMultiplier: finalMultiplier, result: 0, hashedOut: true }
+        : b
+      )
+    );
+
+    const maxPayout = activeBets.reduce((max, bet) => bet.result > max ? bet.result : max, 0);
+    setRecentPayouts(prev => [...prev.slice(-9), maxPayout]);
+    setActiveBets([]);
+    startCountdown();
     
-    // Clean up on unmount
+  };
+
+  const placeBet = (amount: number) => {
+    if (gameState !== "waiting") {
+      toast.error("Only bet during the preparation phase");
+      return;
+    }
+    if (balance < amount) {
+      toast.error("Insufficient balance");
+      return;
+    }
+
+    const alreadyExists = activeBets.some(b => b.username === username);
+    if (alreadyExists) {
+      toast.error("You have already placed a bet. You cannot place a bet again.");
+      return;
+    }
+
+    const newBet: Bet = {
+      id: Math.random().toString(36).substring(2, 9),
+      amount,
+      actualMultiplier: null,
+      result: 0,
+      hashedOut: false,
+      username,
+    };
+
+    setBalance((prev) => prev - amount);
+    setActiveBets((prev) => [...prev, newBet]);
+    toast.success(`Successful betting$${amount}`);
+  };
+
+  const cancelBet = (betId: string) => {
+    if (gameState !== "waiting") return;
+    const bet = activeBets.find((b) => b.id === betId && !b.hashedOut);
+    if (!bet) return;
+
+    setActiveBets((prev) => prev.filter((b) => b.id !== betId));
+    setBalance((prev) => prev + bet.amount);
+    toast.info(`Cancel bet, refund $${bet.amount}`);
+  };
+
+  const cashOut = (betId: string) => {
+    setActiveBets((prev) =>
+      prev.map((b) => {
+        if (b.id === betId && !b.hashedOut) {
+          const winnings = parseFloat((b.amount * currentMultiplierRef.current).toFixed(2));
+          setBalance((balance) => balance + winnings);
+          toast.success(`Cashout successful: $${winnings}`);
+          return {
+            ...b,
+            hashedOut: true,
+            actualMultiplier: currentMultiplierRef.current,
+            result: winnings,
+          };
+        }
+        return b;
+      })
+    );
+  };
+
+  useEffect(() => {
+    startCountdown();
     return () => {
-      if (multiplierInterval) {
-        clearInterval(multiplierInterval);
-      }
-      clearInterval(countdownInterval);
+      clearInterval(multiplierTimerRef.current!);
+      clearInterval(countdownTimerRef.current!);
     };
   }, []);
-  
-  // Context value
-  const contextValue: GameContextType = {
-    balance,
-    setBalance,
-    gameState,
-    currentMultiplier,
-    currentServerSeed,
-    roundHistory,
-    activeBets,
-    placeBet,
-    cancelBet,
-    cashOut,
-    currentRoundId,
-    nextGameCountdown,
-    autoBetSettings,
-    setAutoBetSettings
-  };
-  
+
   return (
-    <GameContext.Provider value={contextValue}>
+    <GameContext.Provider value={{
+      balance, gameState, currentMultiplier, nextGameCountdown,
+      activeBets, placeBet, cancelBet, cashOut,
+      autoBetEnabled, setAutoBetEnabled, autoBetAmount, setAutoBetAmount,
+      autoCashoutEnabled, setAutoCashoutEnabled, autoCashoutValue, setAutoCashoutValue,
+      username,roundId
+    }}>
       {children}
     </GameContext.Provider>
   );
 };
 
-// Custom hook to use the game context
 export const useGame = () => {
   const context = useContext(GameContext);
-  
-  if (context === undefined) {
-    throw new Error("useGame must be used within a GameProvider");
-  }
-  
+  if (!context) throw new Error("useGame must be used within GameProvider");
   return context;
 };
