@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 
-const socket: Socket = io("http://localhost:3000"); // 換成你的後端地址
+const socket: Socket = io("https://crash-game-backend.onrender.com/"); // 換成你的後端地址
 
 export const useCrashSocket = (
   onInit: (username: string) => void,
