@@ -31,8 +31,8 @@ export const generateCrashPoint = (serverSeed: string, scalingFactor: number = 1
   }
   
   // Round to 2 decimal places
-  // return Math.round(result * 100) / 100;
-  return 10;
+  return Math.round(result * 100) / 100;
+  // return 10;
 };
 
 // Function to generate a random server seed (in a real game, this would come from the server)
