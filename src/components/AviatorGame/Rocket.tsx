@@ -1,120 +1,120 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { Rocket as RocketIcon } from "lucide-react";
 
-const Rocket: React.FC = () => {
-  const { gameState, currentMultiplier } = useGame();
+interface RocketProps {
+  canvasSize: { width: number; height: number };
+}
+
+const Rocket: React.FC<RocketProps> = ({ canvasSize }) => {
+  const { gameState } = useGame();
   const rocketRef = useRef<HTMLDivElement>(null);
   const trailsContainerRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const requestRef = useRef<number | null>(null);
+  const [isFloating, setIsFloating] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isCrashedOut, setIsCrashedOut] = useState(false);
+  const crashVelocity = useRef({ x: 4, y: 4 });
+
+  const target = {
+    x: canvasSize.width - 100,
+    y: canvasSize.height - 80,
+  };
 
   const createTrail = () => {
     if (!rocketRef.current || !trailsContainerRef.current) return;
-
     const rocketEl = rocketRef.current;
     const trailsContainer = trailsContainerRef.current;
     const rect = rocketEl.getBoundingClientRect();
-
     const trail = document.createElement("div");
     trail.className = "rocket-trail";
     trail.style.width = `${30 + Math.random() * 20}px`;
     trail.style.left = `${rect.left}px`;
     trail.style.top = `${rect.top + rect.height / 2}px`;
-
     trailsContainer.appendChild(trail);
+    setTimeout(() => trail.remove(), 300);
+  };
 
-    setTimeout(() => {
-      trail.remove();
-    }, 300);
+  const animateNormal = () => {
+    setPosition((prev) => {
+      const distanceX = target.x - prev.x;
+      const distanceY = target.y - prev.y;
+      const distance = Math.sqrt(distanceX ** 2 + distanceY ** 2);
+
+      if (distance < 10) {
+        const floatY = Math.sin(Date.now() / 200) * 5;
+        return {
+          x: target.x,
+          y: target.y + floatY,
+        };
+      }
+
+      const moveSpeed = 0.009;
+      return {
+        x: prev.x + distanceX * moveSpeed,
+        y: prev.y + distanceY * moveSpeed,
+      };
+    });
+
+    createTrail();
+    requestRef.current = requestAnimationFrame(animateNormal);
+  };
+
+  const animateCrashOut = () => {
+    setPosition((prev) => {
+      const nextX = prev.x + crashVelocity.current.x;
+      const nextY = prev.y + crashVelocity.current.y;
+
+      crashVelocity.current.x *= 1.05;
+      crashVelocity.current.y *= 1.05;
+
+      return { x: nextX, y: nextY };
+    });
+
+    requestRef.current = requestAnimationFrame(animateCrashOut);
   };
 
   useEffect(() => {
     if (gameState === "running") {
-      let lastTrailTime = 0;
-
-      const animate = (time: number) => {
-        if (time - lastTrailTime > 50) {
-          createTrail();
-          lastTrailTime = time;
-        }
-
-        animationFrameRef.current = requestAnimationFrame(animate);
-      };
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-      };
+      setIsFloating(false);
+      setIsCrashedOut(false);
+      requestRef.current = requestAnimationFrame(animateNormal);
     }
-  }, [gameState]);
 
-  const getFlightPosition = (multiplier: number) => {
-    const local = multiplier % 3;
-  
-    const startX = 0; 
-    const startY = 0;
-    const amplitudeX = 10;
-    const amplitudeY = 15;
-  
-    let x, y;
-  
-    if (local <= 1.5) {
-      const t = local / 1.5; // 0 → 1
-      x = startX + t * amplitudeX;
-      y = startY + t * amplitudeY;
-    } else {
-      const t = (local - 1.5) / 1.5; // 0 → 1
-      x = startX + amplitudeX * (1 - t);
-      y = startY + amplitudeY * (1 - t);
-    }
-  
-    return {
-      x,
-      y,
-    };
-  };
-  
-
-  const getRocketStyle = () => {
     if (gameState === "waiting") {
-      return {
-        transform: "translate(0, 0) rotate(0deg)",
-        opacity: 1,
-        transition:
-          "transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 1s",
-      };
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      setIsFloating(false);
+      setIsCrashedOut(false);
+      setPosition({ x: 0, y: 0 });
+      crashVelocity.current = { x: 4, y: 4 };
     }
 
-    const { x, y } = getFlightPosition(currentMultiplier);
-    const rotation = Math.min(70, currentMultiplier * 3);
+    if (gameState === "crashed") {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      setIsFloating(false);
+      setIsCrashedOut(true);
+      requestRef.current = requestAnimationFrame(animateCrashOut);
+    }
 
-    return {
-      transform: `translate(${x}vw, -${y}vh) rotate(${rotation}deg)`,
-      opacity: gameState === "crashed" ? 0 : 1,
-      transition:
-        "transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 1s",
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  };
+  }, [gameState, canvasSize]);
 
-  const rocketStyle = getRocketStyle();
+  const rocketStyle = {
+    left: position.x,
+    bottom: position.y,
+    transform: "rotate(30deg)",
+    transition: "none",
+  };
 
   return (
     <>
-      <div
-        ref={trailsContainerRef}
-        className="absolute inset-0 pointer-events-none z-10"
-      />
-      <div
-        ref={rocketRef}
-        className="absolute left-10 bottom-10 z-20 transition-transform"
-        style={rocketStyle}
-      >
-        <RocketIcon size={48} className="text-aviator-red transform rotate-100" />
-      </div>
-    </>
+    <div ref={trailsContainerRef} className="absolute inset-0 pointer-events-none z-10" />
+    <div ref={rocketRef} className="absolute z-20" style={rocketStyle}>
+      <RocketIcon size={48} className="text-aviator-red" />
+    </div>
+  </>
   );
 };
 

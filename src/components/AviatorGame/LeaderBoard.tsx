@@ -1,12 +1,12 @@
 import React from "react";
-import { useGame } from "@/context/GameContext";
+import { Bet, useGame } from "@/context/GameContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { formatCurrency } from "@/utils/gameUtils";
 
 const LeaderBoard: React.FC = () => {
   const { activeBets, gameState, currentMultiplier } = useGame();
 
-  const uniqueBetsMap = new Map<string, typeof activeBets[0]>();
+  const uniqueBetsMap = new Map<string, Bet>();
   for (let bet of activeBets) {
     uniqueBetsMap.set(bet.username, bet);
   }
@@ -36,7 +36,7 @@ const LeaderBoard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={`https://avatar.vercel.sh/${bet.username}`} />
-                  <AvatarFallback>{bet.username[0]}</AvatarFallback>
+                  <AvatarFallback>{bet.username?.[0] ?? "?"}</AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-medium text-sm">{bet.username}</p>

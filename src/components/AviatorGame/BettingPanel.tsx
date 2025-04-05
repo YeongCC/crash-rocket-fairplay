@@ -61,9 +61,10 @@ const BettingPanel: React.FC = () => {
   ]);
   
 
+
   const handlePlaceBet = () => {
     if (betAmount < 1) {
-      toast.error("下注金额必须 ≥ 1");
+      toast.error("Bet amount must be ≥ 1");
       return;
     }
 
@@ -71,6 +72,7 @@ const BettingPanel: React.FC = () => {
   };
 
   const betOptions = [5, 10, 25, 50, 100];
+
 
   return (
     <div className="glass-panel p-6 w-full max-w-md mx-auto">
@@ -133,6 +135,15 @@ const BettingPanel: React.FC = () => {
             onCheckedChange={(checked) => {
               setAutoBetEnabled(checked);
               setAutoBetAmount(betAmount);
+
+              if (
+                checked &&
+                gameState === "waiting" &&
+                balance >= betAmount &&
+                !activeBets.some((b) => b.username === username && !b.hashedOut)
+              ) {
+                placeBet(betAmount);
+              }
             }}
           />
         </div>
@@ -148,7 +159,7 @@ const BettingPanel: React.FC = () => {
           )}
 
           {(gameState === "waiting" || gameState === "crashed") &&
-            currentBet && !currentBet.hashedOut && (
+            currentBet && (
               <Button
                 onClick={() => cancelBet(currentBet.id)}
                 className="w-full h-14 bg-yellow-500 hover:bg-yellow-600 text-white font-bold text-xl"

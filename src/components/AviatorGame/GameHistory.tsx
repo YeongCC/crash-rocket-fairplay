@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 const GameHistory: React.FC = () => {
   const { roundHistory } = useGame();
   
-  // Helper function to get style based on multiplier
   const getMultiplierStyle = (multiplier: number) => {
     if (multiplier < 2) return "bg-gray-500";
     if (multiplier < 5) return "bg-aviator-yellow";

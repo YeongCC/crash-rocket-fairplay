@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 
-const socket: Socket = io("https://crash-game-backend.onrender.com/"); // 換成你的後端地址
+// const socket: Socket = io("http://localhost:3000/"); 
+const socket: Socket = io("https://crash-game-backend.onrender.com/"); 
 
 export const useCrashSocket = (
   onInit: (username: string) => void,
@@ -32,4 +33,8 @@ export const sendBet = (amount: number) => {
 
 export const sendCashOut = () => {
   socket.emit("cash_out");
+};
+
+export const sendCancelBet = (betId: string) => {
+  socket.emit("cancel_bet", { betId });
 };

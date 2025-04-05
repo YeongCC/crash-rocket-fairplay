@@ -141,7 +141,7 @@
 //     setRecentPayouts(prev => [...prev.slice(-9), maxPayout]);
 //     setActiveBets([]);
 //     startCountdown();
-    
+
 //   };
 
 //   const placeBet = (amount: number) => {
@@ -233,22 +233,25 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { toast } from "sonner";
-import {
-  calculateScalingFactor,
-  generateCrashPoint,
-  generateServerSeed,
-} from "@/utils/gameUtils";
-import { useCrashSocket, sendBet, sendCashOut } from "@/hooks/useCrashSocket";
+import { useCrashSocket, sendBet, sendCashOut, sendCancelBet } from "@/hooks/useCrashSocket";
 
 export type GameState = "waiting" | "running" | "crashed";
 
-interface Bet {
+export interface Bet {
   id: string;
   amount: number;
   actualMultiplier: number | null;
   result: number;
   hashedOut: boolean;
   username: string;
+}
+
+interface RoundHistory {
+  id: number;
+  crashPoint: number;
+  timestamp: Date;
+  serverSeed: string;
+  bets: Bet[];
 }
 
 interface GameContextType {
@@ -269,7 +272,8 @@ interface GameContextType {
   autoCashoutValue: number;
   setAutoCashoutValue: (value: number) => void;
   username: string;
-  roundId: any;
+  roundId: number;
+  roundHistory: RoundHistory[];
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -280,79 +284,70 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentMultiplier, setCurrentMultiplier] = useState(1.0);
   const [activeBets, setActiveBets] = useState<Bet[]>([]);
   const [nextGameCountdown, setNextGameCountdown] = useState(5);
-  const [recentPayouts, setRecentPayouts] = useState<number[]>([]);
+  const [roundHistory, setRoundHistory] = useState<RoundHistory[]>([]);
   const [autoBetEnabled, setAutoBetEnabled] = useState(false);
   const [autoBetAmount, setAutoBetAmount] = useState(10);
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
-  const [autoCashoutValue, setAutoCashoutValue] = useState(2.0);
+  const [autoCashoutValue, setAutoCashoutValue] = useState(1.05);
   const [username, setUsername] = useState("");
   const [roundId, setRoundId] = useState(0);
-
   const activeBetsRef = useRef(activeBets);
-  const autoCashoutEnabledRef = useRef(autoCashoutEnabled);
   const autoCashoutValueRef = useRef(autoCashoutValue);
+  const autoCashoutEnabledRef = useRef(autoCashoutEnabled);
   const currentMultiplierRef = useRef(currentMultiplier);
 
-  useEffect(() => {
-    activeBetsRef.current = activeBets;
-  }, [activeBets]);
-  useEffect(() => {
-    autoCashoutEnabledRef.current = autoCashoutEnabled;
-  }, [autoCashoutEnabled]);
-  useEffect(() => {
-    autoCashoutValueRef.current = autoCashoutValue;
-  }, [autoCashoutValue]);
-  useEffect(() => {
-    currentMultiplierRef.current = currentMultiplier;
-  }, [currentMultiplier]);
+  useEffect(() => { activeBetsRef.current = activeBets; }, [activeBets]);
+  useEffect(() => { autoCashoutValueRef.current = autoCashoutValue; }, [autoCashoutValue]);
+  useEffect(() => { autoCashoutEnabledRef.current = autoCashoutEnabled; }, [autoCashoutEnabled]);
+  useEffect(() => { currentMultiplierRef.current = currentMultiplier; }, [currentMultiplier]);
 
-  // ✅ 使用 WebSocket 接收後端狀態
   useCrashSocket(
     (uname) => setUsername(uname),
     (data) => {
       setGameState(data.state);
       setCurrentMultiplier(data.multiplier);
-      setActiveBets(
-        data.bets.map((b: any) => ({
-          id: b.username,
+      setNextGameCountdown(data.countdown ?? 0);
+
+      const bets = data.bets
+        .map((b: any) => ({
+          id: b.clientId,
           username: b.username,
           amount: b.amount,
           actualMultiplier: b.multiplier,
           result: b.cashedOut && b.multiplier ? b.amount * b.multiplier : 0,
           hashedOut: b.cashedOut,
         }))
+
+      const prevActiveBets = activeBetsRef.current;
+
+      const cashedOutBet = bets.find(
+        (b) => b.username === username && b.hashedOut && !prevActiveBets.some(pb => pb.id === b.id && pb.hashedOut)
       );
 
-      // ✅ 自動提現判斷
-      const userBet = data.bets.find((b: any) => b.username === username && !b.cashedOut);
-      if (
-        autoCashoutEnabledRef.current &&
-        userBet &&
-        data.multiplier >= autoCashoutValueRef.current
-      ) {
-        sendCashOut();
+      if (cashedOutBet) {
+        const winAmount = cashedOutBet.amount * (cashedOutBet.actualMultiplier || currentMultiplierRef.current);
+        setBalance(prev => prev + winAmount);
+        toast.success(`Cashout successful: $${winAmount.toFixed(2)}`);
       }
 
-      // ✅ 自動下注
-      if (data.state === "waiting" && autoBetEnabled && balance >= autoBetAmount) {
-        const already = data.bets.find((b: any) => b.username === username);
-        if (!already) {
-          setBalance((b) => b - autoBetAmount);
-          sendBet(autoBetAmount);
-        }
-      }
-
-      // ✅ 遇到爆點後清空下注（本地）
       if (data.state === "crashed") {
-        const payout = data.bets.find((b: any) => b.username === username)?.multiplier ?? 0;
-        if (payout > 0) {
-          const winAmount = data.bets.find((b: any) => b.username === username)?.amount ?? 0;
-          setBalance((b) => b + winAmount * payout);
-          toast.success(`You won $${(winAmount * payout).toFixed(2)}!`);
+        const userBet = bets.find(b => b.username === username && !b.hashedOut);
+        if (userBet) {
+          toast.error("Crashed! You lost your bet.");
         }
-        setRecentPayouts((prev) => [...prev.slice(-9), payout]);
-        setRoundId((r) => r + 1);
+
+        setRoundHistory(prev => [{
+          id: roundId,
+          crashPoint: data.multiplier,
+          timestamp: new Date(),
+          serverSeed: data.crashPoint?.toString() || "-",
+          bets,
+        }, ...prev.slice(0, 29)]);
+
+        setRoundId(prev => prev + 1);
       }
+
+      setActiveBets(bets);
     }
   );
 
@@ -366,49 +361,75 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    const alreadyExists = activeBets.some((b) => b.username === username);
+    const alreadyExists = activeBets.some(
+      (b) => b.username === username && !b.hashedOut
+    );
+
     if (alreadyExists) {
-      toast.error("You have already placed a bet.");
+      toast.error("You already have an active bet.");
       return;
     }
 
-    setBalance((prev) => prev - amount);
+    const newBet: Bet = {
+      id: Math.random().toString(36).substring(2, 9),
+      amount,
+      actualMultiplier: null,
+      result: 0,
+      hashedOut: false,
+      username,
+    };
+    setBalance(prev => prev - amount);
+    setActiveBets(prev => [...prev, newBet]);
     sendBet(amount);
-    toast.success(`Betting $${amount}`);
+    toast.success(`Bet placed: $${amount}`);
   };
 
   const cancelBet = (betId: string) => {
-    // ❌ 暫不支援取消下注（可加功能）
-    toast.error("Cancel not supported in backend-driven mode");
+    if (gameState !== "waiting") return;
+    const bet = activeBets.find(b => b.id === betId && !b.hashedOut);
+    if (!bet) return;
+
+    setBalance(prev => prev + bet.amount);
+    setActiveBets(prev => prev.filter(b => b.id !== betId));
+    sendCancelBet(bet.id);
+    toast.info(`Bet canceled: refunded $${bet.amount}`);
   };
 
   const cashOut = (betId: string) => {
+    const bet = activeBets.find(b => b.id === betId && !b.hashedOut);
+    if (!bet) return;
+
+    const winnings = bet.amount * currentMultiplier;
+    setBalance(prev => prev + winnings);
+
+    setActiveBets(prev => prev.map(b => b.id === betId ? {
+      ...b,
+      hashedOut: true,
+      actualMultiplier: currentMultiplier,
+      result: winnings,
+    } : b));
+
     sendCashOut();
+    toast.success(`Cashout successful: $${winnings.toFixed(2)}`);
   };
 
+  useEffect(() => {
+    if (autoCashoutEnabled && gameState === "running") {
+      const bet = activeBets.find(b => b.username === username && !b.hashedOut);
+      if (bet && currentMultiplier >= autoCashoutValue) {
+        cashOut(bet.id);
+      }
+    }
+  }, [autoCashoutEnabled, currentMultiplier, activeBets, autoCashoutValue, gameState, username]);
+
   return (
-    <GameContext.Provider
-      value={{
-        balance,
-        gameState,
-        currentMultiplier,
-        nextGameCountdown,
-        activeBets,
-        placeBet,
-        cancelBet,
-        cashOut,
-        autoBetEnabled,
-        setAutoBetEnabled,
-        autoBetAmount,
-        setAutoBetAmount,
-        autoCashoutEnabled,
-        setAutoCashoutEnabled,
-        autoCashoutValue,
-        setAutoCashoutValue,
-        username,
-        roundId,
-      }}
-    >
+    <GameContext.Provider value={{
+      balance, gameState, currentMultiplier, nextGameCountdown,
+      activeBets, placeBet, cancelBet, cashOut,
+      autoBetEnabled, setAutoBetEnabled, autoBetAmount, setAutoBetAmount,
+      autoCashoutEnabled, setAutoCashoutEnabled, autoCashoutValue, setAutoCashoutValue,
+      username, roundId, roundHistory
+    }}>
       {children}
     </GameContext.Provider>
   );
