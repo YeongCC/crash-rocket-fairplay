@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
-import { Rocket as RocketIcon } from "lucide-react";
+import { Plane as RocketIcon } from "lucide-react";
 
 interface RocketProps {
   canvasSize: { width: number; height: number };
