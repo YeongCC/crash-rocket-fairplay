@@ -288,7 +288,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [autoBetEnabled, setAutoBetEnabled] = useState(false);
   const [autoBetAmount, setAutoBetAmount] = useState(10);
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
-  const [autoCashoutValue, setAutoCashoutValue] = useState(1.05);
+  const [autoCashoutValue, setAutoCashoutValue] = useState(2.00);
   const [username, setUsername] = useState("");
   const [roundId, setRoundId] = useState(0);
   const activeBetsRef = useRef(activeBets);
