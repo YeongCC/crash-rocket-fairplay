@@ -18,7 +18,7 @@ const Rocket: React.FC<RocketProps> = ({ canvasSize }) => {
 
   const target = {
     x: canvasSize.width - 100,
-    y: canvasSize.height - 80,
+    y: canvasSize.height - 120,
   };
 
   const createTrail = () => {
@@ -112,7 +112,7 @@ const Rocket: React.FC<RocketProps> = ({ canvasSize }) => {
     <>
     <div ref={trailsContainerRef} className="absolute inset-0 pointer-events-none z-10" />
     <div ref={rocketRef} className="absolute z-20" style={rocketStyle}>
-      <RocketIcon size={48} className="text-aviator-red" />
+      <img src="/plane.png" alt="Plane" width={80} height={80} />
     </div>
   </>
   );
