@@ -33,8 +33,8 @@ export const useCrashSocket = (
   }, []);
 };
 
-export const sendBet = (amount: number) => {
-  socket.emit("place_bet", { amount });
+export const sendBet = (amount: number, autoCashout?: number) => {
+  socket.emit("place_bet", { amount, autoCashout });
 };
 
 export const sendCashOut = () => {

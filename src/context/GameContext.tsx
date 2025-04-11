@@ -387,7 +387,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     // setBalance(prev => prev - amount);
     // setActiveBets(prev => [...prev, newBet]);
-    sendBet(amount);
+    sendBet(amount, autoCashoutEnabled ? autoCashoutValue : undefined);
     toast.success(`Bet placed: $${amount}`);
   };
 
