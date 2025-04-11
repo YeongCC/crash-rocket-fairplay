@@ -279,7 +279,7 @@ interface GameContextType {
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [balance, setBalance] = useState(1000);
+  const [balance, setBalance] = useState(0);
   const [gameState, setGameState] = useState<GameState>("waiting");
   const [currentMultiplier, setCurrentMultiplier] = useState(1.0);
   const [activeBets, setActiveBets] = useState<Bet[]>([]);
@@ -295,18 +295,25 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const autoCashoutValueRef = useRef(autoCashoutValue);
   const autoCashoutEnabledRef = useRef(autoCashoutEnabled);
   const currentMultiplierRef = useRef(currentMultiplier);
+  const usernameRef = useRef(username);
 
   useEffect(() => { activeBetsRef.current = activeBets; }, [activeBets]);
   useEffect(() => { autoCashoutValueRef.current = autoCashoutValue; }, [autoCashoutValue]);
   useEffect(() => { autoCashoutEnabledRef.current = autoCashoutEnabled; }, [autoCashoutEnabled]);
   useEffect(() => { currentMultiplierRef.current = currentMultiplier; }, [currentMultiplier]);
+  useEffect(() => {usernameRef.current = username;}, [username]);
 
   useCrashSocket(
-    (uname) => setUsername(uname),
+    (uname) =>{ 
+      setUsername(uname)
+    },  
     (data) => {
       setGameState(data.state);
       setCurrentMultiplier(data.multiplier);
       setNextGameCountdown(data.countdown ?? 0);
+      if (data.balances && usernameRef.current && data.balances[usernameRef.current] !== undefined) {
+        setBalance(data.balances[usernameRef.current]);
+      }
 
       const bets = data.bets
         .map((b: any) => ({
@@ -326,7 +333,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (cashedOutBet) {
         const winAmount = cashedOutBet.amount * (cashedOutBet.actualMultiplier || currentMultiplierRef.current);
-        setBalance(prev => prev + winAmount);
+        // setBalance(prev => prev + winAmount);
         toast.success(`Cashout successful: $${winAmount.toFixed(2)}`);
       }
 
@@ -340,7 +347,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           id: roundId,
           crashPoint: data.multiplier,
           timestamp: new Date(),
-          serverSeed: data.crashPoint?.toString() || "-",
+          serverSeed: "-", 
           bets,
         }, ...prev.slice(0, 29)]);
 
@@ -378,8 +385,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       hashedOut: false,
       username,
     };
-    setBalance(prev => prev - amount);
-    setActiveBets(prev => [...prev, newBet]);
+    // setBalance(prev => prev - amount);
+    // setActiveBets(prev => [...prev, newBet]);
     sendBet(amount);
     toast.success(`Bet placed: $${amount}`);
   };
@@ -389,7 +396,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const bet = activeBets.find(b => b.id === betId && !b.hashedOut);
     if (!bet) return;
 
-    setBalance(prev => prev + bet.amount);
+    // setBalance(prev => prev + bet.amount);
     setActiveBets(prev => prev.filter(b => b.id !== betId));
     sendCancelBet(bet.id);
     toast.info(`Bet canceled: refunded $${bet.amount}`);
@@ -400,7 +407,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!bet) return;
 
     const winnings = bet.amount * currentMultiplier;
-    setBalance(prev => prev + winnings);
+    // setBalance(prev => prev + winnings);
 
     setActiveBets(prev => prev.map(b => b.id === betId ? {
       ...b,

@@ -1,8 +1,14 @@
 import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
+import { getOrCreateUsername } from "@/utils/username";
 
-// const socket: Socket = io("http://localhost:3000/"); 
-const socket: Socket = io("https://crash-game-backend.onrender.com/"); 
+const username = getOrCreateUsername();
+const socket: Socket = io("http://localhost:3000/", {
+  query: { username },
+}); 
+// const socket: Socket = io("https://crash-game-backend.onrender.com/", {
+//   query: { username },
+// }); 
 
 export const useCrashSocket = (
   onInit: (username: string) => void,
