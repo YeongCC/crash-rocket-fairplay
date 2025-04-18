@@ -110,7 +110,6 @@ const Rocket: React.FC<RocketProps> = ({ canvasSize }) => {
 
   return (
     <>
-    <div ref={trailsContainerRef} className="absolute inset-0 pointer-events-none z-10" />
     <div ref={rocketRef} className="absolute z-20" style={rocketStyle}>
       <img src="/plane.png" alt="Plane" width={80} height={80} />
     </div>
