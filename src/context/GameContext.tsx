@@ -251,6 +251,7 @@ interface RoundHistory {
   crashPoint: number;
   timestamp: Date;
   serverSeed: string;
+  hash: string;
   bets: Bet[];
 }
 
@@ -301,12 +302,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => { autoCashoutValueRef.current = autoCashoutValue; }, [autoCashoutValue]);
   useEffect(() => { autoCashoutEnabledRef.current = autoCashoutEnabled; }, [autoCashoutEnabled]);
   useEffect(() => { currentMultiplierRef.current = currentMultiplier; }, [currentMultiplier]);
-  useEffect(() => {usernameRef.current = username;}, [username]);
+  useEffect(() => { usernameRef.current = username; }, [username]);
 
   useCrashSocket(
-    (uname) =>{ 
+    (uname) => {
       setUsername(uname)
-    },  
+    },
     (data) => {
       setGameState(data.state);
       setCurrentMultiplier(data.multiplier);
@@ -338,20 +339,48 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (data.state === "crashed") {
+        if (roundHistory.length > 0 && roundHistory[0].crashPoint === data.crashPoint) {
+          return;
+        }
+
         const userBet = bets.find(b => b.username === username && !b.hashedOut);
         if (userBet) {
           toast.error("Crashed! You lost your bet.");
         }
+        
+        if (data.endCrashPoint) {
+          setRoundHistory(prev => {
+            const updatedHistory = [{
+              id: roundId,
+              crashPoint: data.endCrashPoint,
+              timestamp: new Date(),
+              serverSeed: data.serverSeed,
+              hash: data.hash,
+              bets,
+            }, ...prev.slice(0, 29)];
 
-        setRoundHistory(prev => [{
-          id: roundId,
-          crashPoint: data.multiplier,
-          timestamp: new Date(),
-          serverSeed: "-", 
-          bets,
-        }, ...prev.slice(0, 29)]);
+            let winCount = 0;
+            let loseCount = 0;
 
-        setRoundId(prev => prev + 1);
+            updatedHistory.forEach(round => {
+              round.bets.forEach(bet => {
+                if (bet.username === usernameRef.current) {
+                  if (bet.hashedOut) {
+                    winCount++;
+                  } else {
+                    loseCount++;
+                  }
+                }
+              });
+            });
+
+            // console.log(`✅ Wins: ${winCount}, ❌ Losses: ${loseCount}`);
+            return updatedHistory;
+          });
+
+          setRoundId(prev => prev + 1);
+        }
+
       }
 
       setActiveBets(bets);

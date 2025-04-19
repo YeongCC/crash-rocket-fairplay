@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 
 const GameHistory: React.FC = () => {
   const { roundHistory } = useGame();
-  
+
   const getMultiplierStyle = (multiplier: number) => {
     if (multiplier < 2) return "bg-gray-500";
     if (multiplier < 5) return "bg-aviator-yellow";
     return "bg-aviator-green";
   };
-  
+
   return (
     <div className="w-full max-w-5xl mx-auto glass-panel p-4">
       <h3 className="text-lg font-semibold mb-3">Recent Crashes</h3>
@@ -24,8 +24,8 @@ const GameHistory: React.FC = () => {
           roundHistory.slice(0, 15).map((round, index) => (
             <Popover key={round.id || `round-${index}`}>
               <PopoverTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className={cn(
                     "rounded-full h-10 min-w-10 px-3 text-white",
                     getMultiplierStyle(round.crashPoint)
@@ -40,25 +40,20 @@ const GameHistory: React.FC = () => {
                   <div className="grid grid-cols-2 gap-1 text-sm">
                     <p className="text-gray-500">Crash Point:</p>
                     <p className="font-medium">{round.crashPoint.toFixed(2)}x</p>
-                    
+
                     <p className="text-gray-500">Time:</p>
                     <p className="font-medium">
                       {round.timestamp.toLocaleTimeString()}
                     </p>
-                    
-                    <p className="text-gray-500">Hash:</p>
-                    <p className="font-medium truncate">
-                      {round.serverSeed.substring(0, 8)}...
-                    </p>
                   </div>
-                  
+
                   {round.bets.length > 0 && (
                     <>
                       <h5 className="font-medium mt-3">Bets</h5>
                       <div className="max-h-40 overflow-y-auto">
                         {round.bets.map((bet) => (
-                          <div 
-                            key={bet.id} 
+                          <div
+                            key={bet.id}
                             className="border-b border-gray-100 py-2 grid grid-cols-2 text-xs"
                           >
                             <div>
@@ -79,11 +74,27 @@ const GameHistory: React.FC = () => {
                       </div>
                     </>
                   )}
-                  
+
                   <div className="pt-2 mt-2 border-t border-gray-200">
-                    <p className="text-xs text-gray-500">
-                      Server seed: {round.serverSeed.substring(0, 12)}...
-                    </p>
+                    <div className="text-gray-500">Hash:</div>
+                    <div className="text-xs font-medium break-all col-span-2">
+                      <details>
+                        <summary className="cursor-pointer underline text-blue-400">
+                          {round.hash.substring(0, 8)}...
+                        </summary>
+                        {round.hash}
+                      </details>
+                    </div>
+
+                    <div className="text-gray-500">Server seed:</div>
+                    <div className="text-xs font-medium break-all col-span-2">
+                      <details>
+                        <summary className="cursor-pointer underline text-blue-400">
+                          {round.serverSeed.substring(0, 12)}...
+                        </summary>
+                        {round.serverSeed}
+                      </details>
+                    </div>
                   </div>
                 </div>
               </PopoverContent>
